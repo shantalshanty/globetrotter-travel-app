@@ -9,9 +9,9 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/shantalshanty/globetrotter-travel-app.git'
+                git branch: 'main', url: 'https://github.com/shantalshanty/globetrotter-travel-app.git'
             }
-        }
+    }
 
         stage('Install Dependencies') {
             steps {
