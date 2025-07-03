@@ -4,6 +4,8 @@ pipeline {
     environment {
         IMAGE_NAME = 'shantalshanty/globetrotter-app'
         TAG = 'latest'
+        HOST_PORT = '3001'
+        CONTAINER_PORT = '3000'
     }
 
     stages {
@@ -11,7 +13,7 @@ pipeline {
             steps {
                 git branch: 'main', url: 'https://github.com/shantalshanty/globetrotter-travel-app.git'
             }
-    }
+        }
 
         stage('Install Dependencies') {
             steps {
@@ -38,14 +40,18 @@ pipeline {
 
         stage('Run Docker Container') {
             steps {
-                sh 'docker run -d -p 3000:3000 --name globetrotter $IMAGE_NAME:$TAG'
+                // Remove old container if exists
+                sh 'docker rm -f globetrotter || true'
+
+                // Run new container
+                sh "docker run -d -p $HOST_PORT:$CONTAINER_PORT --name globetrotter $IMAGE_NAME:$TAG"
             }
         }
     }
 
     post {
         success {
-            echo '🚀 Deployment and Docker Hub push complete!'
+            echo "🚀 Deployment and Docker Hub push complete! App running on http://localhost:$HOST_PORT"
         }
         failure {
             echo '❌ Something went wrong. Check logs.'
