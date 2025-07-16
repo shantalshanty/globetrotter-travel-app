@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-     "start": "node app.js"
+    "start": "node app.js"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
     "dotenv": "^17.0.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
-    "helmet": "^8.1.0"
+    "helmet": "^8.1.0",
+    "prom-client": "^15.1.3"
   }
 }

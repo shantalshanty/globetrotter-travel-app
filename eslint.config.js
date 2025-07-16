@@ -1,10 +1,11 @@
 // eslint.config.js
-export default [
+module.exports = [
   {
-    files: ["**/*.js"],
+    files: ['**/*.js'],
     rules: {
-      semi: "error",
-      quotes: ["error", "single"],
+      semi: 'error',
+      quotes: ['error', 'single'],
     },
   },
 ];
+
