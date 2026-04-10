@@ -1,15 +1,23 @@
 pipeline {
     agent any
 
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
     environment {
         IMAGE_NAME = 'shantalshanty/globetrotter-app'
-        TAG = 'latest'
+        TAG = "${BUILD_NUMBER}"
+        CONTAINER_NAME = 'globetrotter'
+        PORT = '3001'
     }
 
     stages {
+
         stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/shantalshanty/globetrotter-travel-app.git'
+                git branch: 'main',
+                    url: 'https://github.com/shantalshanty/globetrotter-travel-app.git'
             }
         }
 
@@ -27,16 +35,19 @@ pipeline {
 
         stage('SAST - Static Analysis') {
             steps {
-                echo '🔍 Running Static Code Analysis...'
                 script {
                     if (isUnix()) {
-                        sh 'npm install eslint'
-                        sh './node_modules/.bin/eslint . || true'
-                        sh 'npm audit --audit-level=high || true'
+                        sh '''
+                            npm install eslint
+                            npx eslint . || true
+                            npm audit --audit-level=high || true
+                        '''
                     } else {
-                        bat 'npm install eslint'
-                        bat 'npx eslint . || exit /b 0'
-                        bat 'npm audit --audit-level=high || exit /b 0'
+                        bat '''
+                            npm install eslint
+                            npx eslint . || exit /b 0
+                            npm audit --audit-level=high || exit /b 0
+                        '''
                     }
                 }
             }
@@ -56,7 +67,11 @@ pipeline {
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'shanty-dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'shanty-dockerhub',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     script {
                         if (isUnix()) {
                             sh '''
@@ -64,10 +79,10 @@ pipeline {
                                 docker push $IMAGE_NAME:$TAG
                             '''
                         } else {
-                            bat """
+                            bat '''
                                 echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                                 docker push %IMAGE_NAME%:%TAG%
-                            """
+                            '''
                         }
                     }
                 }
@@ -79,30 +94,24 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh '''
-                            docker rm -f globetrotter || true
+                            docker rm -f $CONTAINER_NAME || true
 
-                            PORT_IN_USE=$(lsof -ti:3001 || true)
-                            if [ ! -z "$PORT_IN_USE" ]; then
-                                echo "Killing process on port 3001"
-                                kill -9 $PORT_IN_USE
-                            fi
+                            docker run -d -p $PORT:3000 \
+                                --name $CONTAINER_NAME \
+                                $IMAGE_NAME:$TAG
 
-                            sleep 2
-
-                            docker run -d -p 3001:3000 --name globetrotter $IMAGE_NAME:$TAG
+                            echo "Waiting for application..."
+                            sleep 5
                         '''
                     } else {
-                        bat """
+                        bat '''
                             docker stop globetrotter || exit /b 0
                             docker rm globetrotter || exit /b 0
 
-                            FOR /F "tokens=5" %%P IN ('netstat -aon ^| findstr :3001') DO (
-                                taskkill /F /PID %%P
-                            )
-                            timeout /T 2
-
                             docker run -d -p 3001:3000 --name globetrotter %IMAGE_NAME%:%TAG%
-                        """
+
+                            timeout /T 5
+                        '''
                     }
                 }
             }
@@ -110,22 +119,22 @@ pipeline {
 
         stage('DAST - OWASP ZAP Scan') {
             steps {
-                echo '🛡️ Running OWASP ZAP scan...'
                 script {
                     if (isUnix()) {
                         sh '''
-                            docker run -t --network="host" owasp/zap2docker-stable zap-baseline.py \
-                            -t http://localhost:3001 \
-                            -g gen.conf -r zap_report.html || true
+                            docker run -t owasp/zap2docker-stable zap-baseline.py \
+                            -t http://host.docker.internal:3001 \
+                            -r zap_report.html || true
                         '''
                     } else {
-                        bat """
-                            docker run -t --network="host" owasp/zap2docker-stable zap-baseline.py ^
+                        bat '''
+                            docker run -t owasp/zap2docker-stable zap-baseline.py ^
                             -t http://host.docker.internal:3001 ^
-                            -g gen.conf -r zap_report.html || exit /b 0
-                        """
+                            -r zap_report.html || exit /b 0
+                        '''
                     }
                 }
+
                 archiveArtifacts artifacts: 'zap_report.html', allowEmptyArchive: true
             }
         }
@@ -133,10 +142,16 @@ pipeline {
 
     post {
         success {
-            echo '✅ Deployment, Docker Hub push, and security checks complete!'
+            echo '🚀 Pipeline completed successfully: Build, Push, Deploy, and Security Scan done!'
         }
+
         failure {
-            echo '❌ Build failed. Please check the logs.'
+            echo '❌ Pipeline failed. Check logs for details.'
+        }
+
+        always {
+            echo '🧹 Cleaning workspace...'
+            cleanWs()
         }
     }
 }
