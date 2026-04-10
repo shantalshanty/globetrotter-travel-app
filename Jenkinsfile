@@ -12,6 +12,10 @@ pipeline {
         PORT = '3001'
     }
 
+    tools {
+    nodejs 'node18'
+           } 
+
     stages {
 
         stage('Clone Repository') {
@@ -22,16 +26,16 @@ pipeline {
         }
 
         stage('Install Dependencies') {
-            steps {
-                script {
-                    if (isUnix()) {
-                        sh 'npm install'
-                    } else {
-                        bat 'npm install'
-                    }
-                }
-            }
+    agent {
+        docker {
+            image 'node:18'
         }
+    }
+    steps {
+        sh 'npm install'
+    }
+}
+
 
         stage('SAST - Static Analysis') {
             steps {
